@@ -1,4 +1,4 @@
-export const apibaseurl = "http://localhost:8000";
+export const apibaseurl = "https://gateway-q0np.onrender.com";
 export const imgurl = import.meta.env.BASE_URL;
 export function callApi(reqMethod, apiUrl, jsonData, formData, responseHandler, jwtToken = "")
 {
