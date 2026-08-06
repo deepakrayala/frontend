@@ -11,14 +11,14 @@ const MyTasks = ({logout}) => {
             setMyTasks([]);
             return;
         }
-        fetchAllTasks(me.email || "");
+        fetchAllTasks(me.email || "", me.id, me._id);
     }
 
-    function fetchAllTasks(email){
-        callApi("GET", apibaseurl + "/taskservice/getalltasks/1/50", null, null, (res) => handlePage(res, email), localStorage.getItem("token"));
+    function fetchAllTasks(email, myid, myoid){
+        callApi("GET", apibaseurl + "/taskservice/getalltasks/1/50", null, null, (res) => handlePage(res, email, myid, myoid), localStorage.getItem("token"));
     }
 
-    function handlePage(res, email){
+    function handlePage(res, email, myid, myoid){
         if(res.code !== 200){
             setMyTasks([]);
             return;
@@ -26,7 +26,7 @@ const MyTasks = ({logout}) => {
         const collected = [...(res.tasks || [])];
         const total = Math.min(res.totalpages || 1, 20);
         if(total <= 1){
-            finish(collected, email);
+            finish(collected, email, myid, myoid);
             return;
         }
         let pending = total - 1;
@@ -36,22 +36,28 @@ const MyTasks = ({logout}) => {
                     collected.push(...r.tasks);
                 pending--;
                 if(pending === 0)
-                    finish(collected, email);
+                    finish(collected, email, myid, myoid);
             }, localStorage.getItem("token"));
         }
     }
 
-    function finish(all, email) {
-    const emailStr = String(email || "").toLowerCase();
-
-    setMyTasks(
-        all.filter(task =>
-            String(task.assignedto || "").toLowerCase() === emailStr
-        )
-    );
-}
-
-
+    function finish(all, email, myid, myoid){
+        // Match against every identity the account can have: numeric id, _id and email
+        const idSet = new Set([myid, myoid].filter(v => v !== undefined && v !== null && v !== "").map(v => String(v).trim().toLowerCase()));
+        const emailStr = String(email || "").trim().toLowerCase();
+        const mine = all.filter(t => {
+            if(!t) return false;
+            const a = t.assignedto !== undefined && t.assignedto !== null ? String(t.assignedto).trim().toLowerCase() : "";
+            if(a === "")
+                return false;
+            if(idSet.has(a))
+                return true;
+            if(emailStr !== "" && a === emailStr)
+                return true;
+            return false;
+        });
+        setMyTasks(mine);
+    }
 
     useEffect(()=>{
         const storedtoken = localStorage.getItem("token");
