@@ -11,14 +11,14 @@ const MyTasks = ({logout}) => {
             setMyTasks([]);
             return;
         }
-        fetchAllTasks(me.email || "", me.id !== undefined ? me.id : me._id);
+        fetchAllTasks(me.email || "");
     }
 
-    function fetchAllTasks(email, myid){
-        callApi("GET", apibaseurl + "/taskservice/getalltasks/1/50", null, null, (res) => handlePage(res, email, myid), localStorage.getItem("token"));
+    function fetchAllTasks(email){
+        callApi("GET", apibaseurl + "/taskservice/getalltasks/1/50", null, null, (res) => handlePage(res, email), localStorage.getItem("token"));
     }
 
-    function handlePage(res, email, myid){
+    function handlePage(res, email){
         if(res.code !== 200){
             setMyTasks([]);
             return;
@@ -26,7 +26,7 @@ const MyTasks = ({logout}) => {
         const collected = [...(res.tasks || [])];
         const total = Math.min(res.totalpages || 1, 20);
         if(total <= 1){
-            finish(collected, email, myid);
+            finish(collected, email);
             return;
         }
         let pending = total - 1;
@@ -36,26 +36,22 @@ const MyTasks = ({logout}) => {
                     collected.push(...r.tasks);
                 pending--;
                 if(pending === 0)
-                    finish(collected, email, myid);
+                    finish(collected, email);
             }, localStorage.getItem("token"));
         }
     }
 
-    function finish(all, email, myid){
-        const myidStr = myid !== undefined && myid !== null ? String(myid).toLowerCase() : "";
-        const emailStr = String(email || "").toLowerCase();
-        const mine = all.filter(t => {
-            const a = t && t.assignedto !== undefined && t.assignedto !== null ? String(t.assignedto).toLowerCase() : "";
-            if(a === "")
-                return false;
-            if(myidStr !== "" && a === myidStr)
-                return true;
-            if(emailStr !== "" && a === emailStr)
-                return true;
-            return false;
-        });
-        setMyTasks(mine);
-    }
+    function finish(all, email) {
+    const emailStr = String(email || "").toLowerCase();
+
+    setMyTasks(
+        all.filter(task =>
+            String(task.assignedto || "").toLowerCase() === emailStr
+        )
+    );
+}
+
+
 
     useEffect(()=>{
         const storedtoken = localStorage.getItem("token");
