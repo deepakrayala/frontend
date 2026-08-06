@@ -30,8 +30,49 @@ const Home = () => {
     function loadProfile(res){
         if(!res?.user)
             return;
-        setFullname(res.user[0]?.fullname || fullname);
+        const me = res.user[0];
+        setFullname(me?.fullname || fullname);
         setRolename(res.user[1]?.rolename || "");
+        // Count only the tasks assigned to this account (by id, _id or email)
+        if(me)
+            callApi("GET", apibaseurl + "/taskservice/getalltasks/1/50", null, null, (r) => countTasksPage(r, me.email || "", me.id, me._id), localStorage.getItem("token"));
+    }
+
+    function countTasksPage(res, email, myid, myoid){
+        if(res?.code !== 200){
+            setStats(s => ({...s, tasks: 0}));
+            return;
+        }
+        const collected = [...(res.tasks || [])];
+        const total = Math.min(res.totalpages || 1, 20);
+        if(total <= 1){
+            countTasksFinish(collected, email, myid, myoid);
+            return;
+        }
+        let pending = total - 1;
+        for(let p = 2; p <= total; p++){
+            callApi("GET", apibaseurl + "/taskservice/getalltasks/" + p + "/50", null, null, (r) => {
+                if(r?.code === 200 && r.tasks)
+                    collected.push(...r.tasks);
+                pending--;
+                if(pending === 0)
+                    countTasksFinish(collected, email, myid, myoid);
+            }, localStorage.getItem("token"));
+        }
+    }
+
+    function countTasksFinish(all, email, myid, myoid){
+        const idSet = new Set([myid, myoid].filter(v => v !== undefined && v !== null && v !== "").map(v => String(v).trim().toLowerCase()));
+        const emailStr = String(email || "").trim().toLowerCase();
+        const assigned = all.filter(t => {
+            if(!t) return false;
+            const a = t.assignedto !== undefined && t.assignedto !== null ? String(t.assignedto).trim().toLowerCase() : "";
+            if(a === "") return false;
+            if(idSet.has(a)) return true;
+            if(emailStr !== "" && a === emailStr) return true;
+            return false;
+        }).length;
+        setStats(s => ({...s, tasks: assigned}));
     }
 
     function loadRBAC(res){
@@ -43,18 +84,11 @@ const Home = () => {
         const menus = res.menulist.filter(m => (m.menu || "").toLowerCase() !== "dashboard");
         setMenuList(menus);
 
-        // Fetch dashboard counts silently (never alert on failure)
+        // Fetch user count silently (never alert on failure)
         const mids = menus.map(m => m.mid);
         const jwt = localStorage.getItem("token");
-        if(mids.includes(3))
-            callApi("GET", apibaseurl + "/taskservice/getalltasks/1/1", null, null, tasksStatsHandler, jwt);
         if(mids.includes(4))
             callApi("GET", apibaseurl + "/authservice/getallusers/1/1", null, null, usersStatsHandler, jwt);
-    }
-
-    function tasksStatsHandler(res){
-        if(res?.code === 200 && res?.totalpages !== undefined)
-            setStats(s => ({...s, tasks: res.totalpages}));
     }
 
     function usersStatsHandler(res){
@@ -67,20 +101,25 @@ const Home = () => {
         window.location.replace("/");
     }
 
-    function loadModule(mid){
+    function loadModule(key){
         setIsProgress(true);
-        setActiveMenu(mid);
+        setActiveMenu(key);
         setActiveComponent(null);
-        const menu = menuList.find(m => m.mid === mid);
         let component = null;
-        if(menu && /^my\s*tasks?$/i.test(menu.menu || ""))
+        // "mytask" is the app-level entry shown to every account (even when RBAC omits it)
+        if(key === "mytask")
             component = <MyTasks logout={logout} />;
-        else
-            component = {
-                3: <TaskManager logout={logout} />,
-                4: <UserManager logout={logout} />,
-                5: <Profile logout={logout} />
-            }[mid];
+        else{
+            const menu = menuList.find(m => m.mid === key);
+            if(menu && /^my\s*tasks?$/i.test(menu.menu || ""))
+                component = <MyTasks logout={logout} />;
+            else
+                component = {
+                    3: <TaskManager logout={logout} />,
+                    4: <UserManager logout={logout} />,
+                    5: <Profile logout={logout} />
+                }[key];
+        }
         setActiveComponent(component);
         setIsProgress(false);
         setIsMenuOpen(false);
@@ -108,8 +147,8 @@ const Home = () => {
     const greeting = hour < 12 ? "Good Morning" : hour < 17 ? "Good Afternoon" : "Good Evening";
     const today = new Date().toLocaleDateString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric" });
     const initial = (fullname || "U").trim().charAt(0).toUpperCase();
-    const hasTaskModule = menuList.some(m => m.mid === 3);
     const hasUserModule = menuList.some(m => m.mid === 4);
+    const hasMyTaskMenu = menuList.some(m => /^my\s*tasks?$/i.test(m.menu || ""));
 
     return (
         <div className='home'>
@@ -143,6 +182,11 @@ const Home = () => {
                         <li className={activeMenu === "home" ? 'active' : ''} onClick={()=>goHome()}>
                             <img src={imgurl + "dashboard.png"} alt='' />Dashboard
                         </li>
+                        {!hasMyTaskMenu &&
+                            <li className={activeMenu === "mytask" ? 'active' : ''} onClick={()=>loadModule("mytask")}>
+                                <img src={imgurl + "mytask.png"} alt='' />My Task
+                            </li>
+                        }
                         {menuList.map((m)=>(
                             <li key={m.mid} className={activeMenu === m.mid ? 'active' : ''} onClick={()=>loadModule(m.mid)}>
                                 <img src={imgurl + (m.micon || "logoico.png")} alt='' />{m.menu}
@@ -170,15 +214,13 @@ const Home = () => {
                             </div>
 
                             <div className='dash-stats'>
-                                {hasTaskModule &&
-                                    <div className='stat-card'>
-                                        <div className='stat-icon blue'><img src={imgurl + "mytask.png"} alt='' /></div>
-                                        <div className='stat-info'>
-                                            <label>My Tasks</label>
-                                            <span>{stats.tasks !== null ? stats.tasks : "—"}</span>
-                                        </div>
+                                <div className='stat-card'>
+                                    <div className='stat-icon blue'><img src={imgurl + "mytask.png"} alt='' /></div>
+                                    <div className='stat-info'>
+                                        <label>My Tasks</label>
+                                        <span>{stats.tasks !== null ? stats.tasks : "—"}</span>
                                     </div>
-                                }
+                                </div>
                                 {hasUserModule &&
                                     <div className='stat-card'>
                                         <div className='stat-icon green'><img src={imgurl + "usermanager.png"} alt='' /></div>
@@ -203,6 +245,13 @@ const Home = () => {
                                     <div className='dash-empty'>No modules are available for your account yet.</div>
                                 ) : (
                                     <div className='dash-quick'>
+                                        {!hasMyTaskMenu &&
+                                            <div className='quick-card' onClick={()=>loadModule("mytask")}>
+                                                <img src={imgurl + "mytask.png"} alt='' />
+                                                <label>My Task</label>
+                                                <span>Tasks assigned to your account.</span>
+                                            </div>
+                                        }
                                         {menuList.map((m)=>(
                                             <div key={m.mid} className='quick-card' onClick={()=>loadModule(m.mid)}>
                                                 <img src={imgurl + (m.micon || "logoico.png")} alt='' />
