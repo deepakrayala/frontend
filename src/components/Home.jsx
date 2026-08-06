@@ -38,10 +38,12 @@ const Home = () => {
         if(res.code != 200)
             return;
         setFullname(res.fullname);
-        setMenuList(res.menulist);
+        // The app provides its own Dashboard entry, so ignore any dashboard menu item from the backend
+        const menus = res.menulist.filter(m => (m.menu || "").toLowerCase() !== "dashboard");
+        setMenuList(menus);
 
         // Fetch dashboard counts silently (never alert on failure)
-        const mids = res.menulist.map(m => m.mid);
+        const mids = menus.map(m => m.mid);
         const jwt = localStorage.getItem("token");
         if(mids.includes(3))
             callApi("GET", apibaseurl + "/taskservice/getalltasks/1/1", null, null, tasksStatsHandler, jwt);
@@ -151,7 +153,7 @@ const Home = () => {
                         <div className='dash'>
                             <div className='dash-banner'>
                                 <div className='dash-banner-info'>
-                                    <label>{greeting}, {fullname || "there"}!</label>
+                                    <label>{greeting}{fullname ? `, ${fullname}` : ""}!</label>
                                     <span>{today}</span>
                                     <p>Here's what's happening in your TaskHub workspace today.</p>
                                 </div>
