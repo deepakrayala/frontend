@@ -94,11 +94,14 @@ const TaskManager = ({logout}) => {
         setShowDropdown(res.users.length > 0);
     }
 
-    function selectUser(user){
-        setSearchValue(user.fullname + " (" + user.email + ")");
-        setTaskData({...taskData, ['assignedto']:user.id});
-        setShowDropdown(false);
-    }
+    function selectUser(user) {
+    setSearchValue(user.fullname + " (" + user.email + ")");
+    setTaskData({
+        ...taskData,
+        assignedto: user.email
+    });
+    setShowDropdown(false);
+}
 
     function completeSearchUser(e){
         setShowDropdown(false);
@@ -109,7 +112,7 @@ const TaskManager = ({logout}) => {
         const user = options[index];
 
         setSearchValue(user.fullname + " (" + user.email + ")");
-        setTaskData({...taskData, ['assignedto']:user.id});
+        setTaskData({...taskData, ['assignedto']:user.email});
     }
 
     function handleKeyDown(e) {
@@ -189,7 +192,7 @@ const TaskManager = ({logout}) => {
         }
         setTaskData(res.task);
         const assignedto = res.task?.assignedto;
-        callApi("GET", apibaseurl + "/authservice/getuser/" + assignedto, null, null, loadSearchUser, token);
+        callApi("GET", apibaseurl + "/authservice/getuserbyemail/" + assignedto, null, null, loadSearchUser, token);
         
     }
 
