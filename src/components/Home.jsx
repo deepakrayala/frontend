@@ -5,6 +5,7 @@ import ProgressBar from './ProgressBar';
 import Profile from './Profile';
 import UserManager from './UserManager';
 import TaskManager from './TaskManager';
+import MyTasks from './MyTasks';
 
 const Home = () => {
     const [fullname, setFullname] = useState("");
@@ -70,12 +71,17 @@ const Home = () => {
         setIsProgress(true);
         setActiveMenu(mid);
         setActiveComponent(null);
-        const component = {
-            3: <TaskManager logout={logout} />,
-            4: <UserManager logout={logout} />,
-            5: <Profile logout={logout} />
-        };
-        setActiveComponent(component[mid]);
+        const menu = menuList.find(m => m.mid === mid);
+        let component = null;
+        if(menu && /^my\s*tasks?$/i.test(menu.menu || ""))
+            component = <MyTasks logout={logout} />;
+        else
+            component = {
+                3: <TaskManager logout={logout} />,
+                4: <UserManager logout={logout} />,
+                5: <Profile logout={logout} />
+            }[mid];
+        setActiveComponent(component);
         setIsProgress(false);
         setIsMenuOpen(false);
     }
@@ -87,6 +93,9 @@ const Home = () => {
     }
 
     function moduleDesc(mid){
+        const menu = menuList.find(m => m.mid === mid);
+        if(menu && /^my\s*tasks?$/i.test(menu.menu || ""))
+            return "Tasks assigned to your account.";
         const desc = {
             3: "Create, assign and track tasks with ease.",
             4: "Manage users, roles and access.",
