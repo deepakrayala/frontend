@@ -67,20 +67,25 @@ const Home = () => {
         window.location.replace("/");
     }
 
-    function loadModule(mid){
+    function loadModule(key){
         setIsProgress(true);
-        setActiveMenu(mid);
+        setActiveMenu(key);
         setActiveComponent(null);
-        const menu = menuList.find(m => m.mid === mid);
         let component = null;
-        if(menu && /^my\s*tasks?$/i.test(menu.menu || ""))
+        // "mytask" is the app-level entry shown to every account (even when RBAC omits it)
+        if(key === "mytask")
             component = <MyTasks logout={logout} />;
-        else
-            component = {
-                3: <TaskManager logout={logout} />,
-                4: <UserManager logout={logout} />,
-                5: <Profile logout={logout} />
-            }[mid];
+        else{
+            const menu = menuList.find(m => m.mid === key);
+            if(menu && /^my\s*tasks?$/i.test(menu.menu || ""))
+                component = <MyTasks logout={logout} />;
+            else
+                component = {
+                    3: <TaskManager logout={logout} />,
+                    4: <UserManager logout={logout} />,
+                    5: <Profile logout={logout} />
+                }[key];
+        }
         setActiveComponent(component);
         setIsProgress(false);
         setIsMenuOpen(false);
@@ -110,6 +115,7 @@ const Home = () => {
     const initial = (fullname || "U").trim().charAt(0).toUpperCase();
     const hasTaskModule = menuList.some(m => m.mid === 3);
     const hasUserModule = menuList.some(m => m.mid === 4);
+    const hasMyTaskMenu = menuList.some(m => /^my\s*tasks?$/i.test(m.menu || ""));
 
     return (
         <div className='home'>
@@ -143,6 +149,11 @@ const Home = () => {
                         <li className={activeMenu === "home" ? 'active' : ''} onClick={()=>goHome()}>
                             <img src={imgurl + "dashboard.png"} alt='' />Dashboard
                         </li>
+                        {!hasMyTaskMenu &&
+                            <li className={activeMenu === "mytask" ? 'active' : ''} onClick={()=>loadModule("mytask")}>
+                                <img src={imgurl + "mytask.png"} alt='' />My Task
+                            </li>
+                        }
                         {menuList.map((m)=>(
                             <li key={m.mid} className={activeMenu === m.mid ? 'active' : ''} onClick={()=>loadModule(m.mid)}>
                                 <img src={imgurl + (m.micon || "logoico.png")} alt='' />{m.menu}
@@ -203,6 +214,13 @@ const Home = () => {
                                     <div className='dash-empty'>No modules are available for your account yet.</div>
                                 ) : (
                                     <div className='dash-quick'>
+                                        {!hasMyTaskMenu &&
+                                            <div className='quick-card' onClick={()=>loadModule("mytask")}>
+                                                <img src={imgurl + "mytask.png"} alt='' />
+                                                <label>My Task</label>
+                                                <span>Tasks assigned to your account.</span>
+                                            </div>
+                                        }
                                         {menuList.map((m)=>(
                                             <div key={m.mid} className='quick-card' onClick={()=>loadModule(m.mid)}>
                                                 <img src={imgurl + (m.micon || "logoico.png")} alt='' />
