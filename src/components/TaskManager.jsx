@@ -96,25 +96,20 @@ const TaskManager = ({logout}) => {
 
     function selectUser(user){
         setSearchValue(user.fullname + " (" + user.email + ")");
-        setTaskData({...taskData, ['assignedto']:user.email});
+        setTaskData({...taskData, ['assignedto']:user.id});
         setShowDropdown(false);
     }
 
     function completeSearchUser(e){
         setShowDropdown(false);
-        if(options.length === 0){
-            // No user found in the dropdown: accept a directly typed email as the assignee
-            const typed = String(searchvalue || "").trim();
-            if(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(typed))
-                setTaskData({...taskData, ['assignedto']: typed});
+        if(options.length === 0)
             return;
-        }
 
         const index = highlightIndex >= 0 ? highlightIndex : 0;
         const user = options[index];
 
         setSearchValue(user.fullname + " (" + user.email + ")");
-        setTaskData({...taskData, ['assignedto']:user.email});
+        setTaskData({...taskData, ['assignedto']:user.id});
     }
 
     function handleKeyDown(e) {
@@ -141,7 +136,7 @@ const TaskManager = ({logout}) => {
         let errors = {};
         if(taskData?.title === "") errors.title = true;
         if(taskData?.description === "") errors.description = true;
-        if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(searchvalue || "").trim())) errors.assignedto = true;
+        if(searchvalue === "") errors.assignedto = true;
         if(taskData?.priority === "") errors.priority = true;
         if(taskData?.deadline === "") errors.deadline = true;
         if(taskData?.status === "") errors.status = true;
@@ -153,15 +148,11 @@ const TaskManager = ({logout}) => {
         if(validateData())
             return;
 
-        const finalTask = {...taskData};
-        if(!finalTask.assignedto || String(finalTask.assignedto).trim() === "")
-            finalTask.assignedto = String(searchvalue || "").trim();
-
         setIsProgress(true);
-        if(finalTask.id === "")
-            callApi("POST", apibaseurl + "/taskservice/createtask", finalTask, null, saveTaskHandler, token);
+        if(taskData?.id === "")
+            callApi("POST", apibaseurl + "/taskservice/createtask", taskData, null, saveTaskHandler, token);
         else
-            callApi("PUT", apibaseurl + "/taskservice/updatetask/" + finalTask._id, finalTask, null, saveTaskHandler, token);
+            callApi("PUT", apibaseurl + "/taskservice/updatetask/" + taskData?._id, taskData, null, saveTaskHandler, token);
     }
 
     function saveTaskHandler(res){
@@ -203,10 +194,7 @@ const TaskManager = ({logout}) => {
     }
 
     function loadSearchUser(res){
-        if(res?.user?.fullname)
-            setSearchValue(res.user.fullname + " (" + res.user.email + ")");
-        else
-            setSearchValue(taskData?.assignedto !== undefined && taskData?.assignedto !== null ? String(taskData.assignedto) : "");
+        setSearchValue(res.user?.fullname + " (" + res.user?.email + ")");
         setOptions([]);
         setShowPopup(true);
         setTimeout(() => {tsktitle.current?.focus();}, 0);
