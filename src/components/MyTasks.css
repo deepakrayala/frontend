@@ -1,0 +1,75 @@
+.mtasks{
+    width: 100%;
+    height: 100%;
+    display: grid;
+    grid-template-rows: 40px calc(100% - 40px);
+    position: relative;
+}
+.mtasks .mtasks-header{
+    font-size: 14pt;
+    font-weight: 600;
+    background: var(--background);
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border-color);
+}
+.mtasks .mtasks-header label{
+    padding-left: 5px;
+}
+.mtasks .mtasks-header .mtasks-count{
+    font-size: 9pt;
+    font-weight: 600;
+    color: var(--background);
+    background: var(--secondary-color);
+    border-radius: 10px;
+    padding: 3px 10px;
+    margin-right: 5px;
+}
+.mtasks .mtasks-content{
+    overflow: auto;
+    background: var(--background-secondary);
+}
+.mtasks .mtasks-content table{
+    width: 100%;
+    border-collapse: collapse;
+}
+.mtasks .mtasks-content table thead{
+    position: sticky;
+    top: 0;
+    background: var(--background);
+}
+.mtasks .mtasks-content table tr th,
+.mtasks .mtasks-content table tr td{
+    padding: 2px;
+    height: 35px;
+    border: 1px solid var(--border-color);
+}
+.mtasks .mtasks-content table tr:nth-child(odd){
+    background: var(--background);
+}
+.mtasks .mtasks-content .mtasks-empty,
+.mtasks .mtasks-content .mtasks-loading{
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: var(--text-gray);
+}
+.mtasks .mtasks-content .mtasks-empty img{
+    width: 50px;
+    height: 50px;
+    opacity: 0.6;
+}
+.mtasks .mtasks-content .mtasks-empty label{
+    font-size: 11pt;
+    font-weight: 600;
+    color: var(--text-dark);
+}
+.mtasks .mtasks-content .mtasks-empty span,
+.mtasks .mtasks-content .mtasks-loading{
+    font-size: 9.5pt;
+}
