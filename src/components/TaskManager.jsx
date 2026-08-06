@@ -94,25 +94,47 @@ const TaskManager = ({logout}) => {
         setShowDropdown(res.users.length > 0);
     }
 
-    function selectUser(user) {
-    setSearchValue(user.fullname + " (" + user.email + ")");
-    setTaskData({
-        ...taskData,
-        assignedto: user.email
-    });
-    setShowDropdown(false);
-}
+    function selectUser(user){
+        setSearchValue(user.fullname + " (" + user.email + ")");
+        setTaskData({...taskData, ['assignedto']:user.id});
+        setShowDropdown(false);
+    }
 
     function completeSearchUser(e){
         setShowDropdown(false);
-        if(options.length === 0)
+        if(options.length === 0){
+            // No user found in the dropdown: if a valid email was typed, resolve it to a
+            // user account and store the numeric id (the backend only accepts numeric ids).
+            const typed = String(searchvalue || "").trim();
+            if(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(typed))
+                resolveUserByEmail(typed);
+            else
+                setTaskData({...taskData, ['assignedto']: ""});
             return;
+        }
 
         const index = highlightIndex >= 0 ? highlightIndex : 0;
         const user = options[index];
 
         setSearchValue(user.fullname + " (" + user.email + ")");
-        setTaskData({...taskData, ['assignedto']:user.email});
+        setTaskData({...taskData, ['assignedto']:user.id});
+    }
+
+    function resolveUserByEmail(email){
+        // The user search endpoint only matches full names, so look up the account by email
+        // and store its numeric id as the assignee.
+        callApi("GET", apibaseurl + "/authservice/getallusers/1/50", null, null, (res) => {
+            if(res?.code === 200 && Array.isArray(res?.users)){
+                const target = String(email).trim().toLowerCase();
+                const found = res.users.find(u => u && String(u.email || "").trim().toLowerCase() === target);
+                if(found){
+                    setSearchValue(found.fullname + " (" + found.email + ")");
+                    setTaskData({...taskData, ['assignedto']: found.id});
+                }else{
+                    setTaskData({...taskData, ['assignedto']: ""});
+                }
+            }
+        }, token);
     }
 
     function handleKeyDown(e) {
@@ -139,7 +161,11 @@ const TaskManager = ({logout}) => {
         let errors = {};
         if(taskData?.title === "") errors.title = true;
         if(taskData?.description === "") errors.description = true;
-        if(searchvalue === "") errors.assignedto = true;
+        const assignedtoVal = taskData?.assignedto;
+        const hasNumericAssignee = assignedtoVal !== undefined && assignedtoVal !== null && String(assignedtoVal).trim() !== "" && !isNaN(Number(assignedtoVal));
+        const typedEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(searchvalue || "").trim());
+        if(!hasNumericAssignee && !typedEmail)
+            errors.assignedto = true;
         if(taskData?.priority === "") errors.priority = true;
         if(taskData?.deadline === "") errors.deadline = true;
         if(taskData?.status === "") errors.status = true;
@@ -151,11 +177,40 @@ const TaskManager = ({logout}) => {
         if(validateData())
             return;
 
+        const assignedtoVal = taskData?.assignedto;
+        const hasNumericAssignee = assignedtoVal !== undefined && assignedtoVal !== null && String(assignedtoVal).trim() !== "" && !isNaN(Number(assignedtoVal));
+        if(!hasNumericAssignee){
+            // The assignee was typed directly as an email: resolve it to a user account first
+            const typed = String(searchvalue || "").trim();
+            if(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(typed)){
+                setIsProgress(true);
+                callApi("GET", apibaseurl + "/authservice/getallusers/1/50", null, null, (res) => {
+                    let found = null;
+                    if(res?.code === 200 && Array.isArray(res?.users)){
+                        const target = typed.trim().toLowerCase();
+                        found = res.users.find(u => u && String(u.email || "").trim().toLowerCase() === target) || null;
+                    }
+                    if(found){
+                        setSearchValue(found.fullname + " (" + found.email + ")");
+                        doSave({...taskData, ['assignedto']: found.id});
+                    }else{
+                        alert("No user found with email: " + typed + ". Please pick the person from the list.");
+                        setIsProgress(false);
+                    }
+                }, token);
+                return;
+            }
+        }
+
+        doSave(taskData);
+    }
+
+    function doSave(payload){
         setIsProgress(true);
-        if(taskData?.id === "")
-            callApi("POST", apibaseurl + "/taskservice/createtask", taskData, null, saveTaskHandler, token);
+        if(payload?.id === "")
+            callApi("POST", apibaseurl + "/taskservice/createtask", payload, null, saveTaskHandler, token);
         else
-            callApi("PUT", apibaseurl + "/taskservice/updatetask/" + taskData?._id, taskData, null, saveTaskHandler, token);
+            callApi("PUT", apibaseurl + "/taskservice/updatetask/" + payload?._id, payload, null, saveTaskHandler, token);
     }
 
     function saveTaskHandler(res){
@@ -192,12 +247,15 @@ const TaskManager = ({logout}) => {
         }
         setTaskData(res.task);
         const assignedto = res.task?.assignedto;
-        callApi("GET", apibaseurl + "/authservice/getuserbyemail/" + assignedto, null, null, loadSearchUser, token);
+        callApi("GET", apibaseurl + "/authservice/getuser/" + assignedto, null, null, loadSearchUser, token);
         
     }
 
     function loadSearchUser(res){
-        setSearchValue(res.user?.fullname + " (" + res.user?.email + ")");
+        if(res?.user?.fullname)
+            setSearchValue(res.user.fullname + " (" + res.user.email + ")");
+        else
+            setSearchValue(taskData?.assignedto !== undefined && taskData?.assignedto !== null ? String(taskData.assignedto) : "");
         setOptions([]);
         setShowPopup(true);
         setTimeout(() => {tsktitle.current?.focus();}, 0);
